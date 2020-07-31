@@ -1,0 +1,247 @@
+<html>
+<script src="https://d3js.org/d3.v5.min.js"></script>
+<!-- Materialize CSS-->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+<script>
+  const STAGES = [
+    {
+      title: "Moore's Law",
+      description: "Proposed by Gorden Moore in 1965, Moore's Law describes the empirical observation that " +
+        "the number of transistors on an integrated circuit seems to double every two years, which roughly corresponds " +
+        "to the doubling of performance. " +
+        "</br></br>As the chart on the left shows, this effect was observed throughout the late 20th centry and into early 21th centry. " +
+        "These achievements facilitated the mainstream adoption of personal computers, smart phone, and fundamentally changed the way we live. [1]" +
+        "</br></br>However, despite its historical accuracy, people are starting to doubt whether this law will " +
+        "continue to hold in the future.",
+      chart: {
+        end_year: 2005,
+        series: ["transistors", "frequency"],
+        scale: "1",
+      }
+    },
+    {
+      title: "Overheating and Multi-core",
+      description: "In the early 2000s, Moore's law faced its a major obstacle. Halving the size " +
+        "of transistors became extremely uneconomical due to fact that transistors beggn to generate excessive heat. " +
+        "To limit the heat, the performance of each core had to be capped. " +
+        "</br></br>As a result, manufacturers began to adopt alternative architectures like the multi-core architecture. " +
+        "As the chart indicates, single core performance essentially plateaued since the early 2000s. But thanks to the increasing " +
+        "number of cores, we were still able to keep up with the pace of Moore's law. [2]" +
+        "</br></br>More cores, however, doesn't magically improve the speed of the system. As anyone who has dealt with concurrency can attest, " +
+        "it is tricky to write software that takes full advantage of all the cores available. It is also not at all sure how many cores we can keep packing " +
+        "in a single chip in the future [3]. As a result, people are increasingly alarmed by the potential death of Moore's law.",
+      chart: {
+        end_year: 2020,
+        series: ["transistors", "frequency", "cores"],
+        scale: "1",
+      }
+    },
+    {
+      title: "Paths Forward",
+      description: "Many paths forward has been suggested to deal with the end of Moore's law. " +
+        "</br></br>Importantly, instead of focusing on the number of total transistors, the priority of chip manufacturers should be shifted to energy efficiency [3]. " +
+        "This is consistent with the trend we've been observing empirically. As the total number of cores and transistors increase steadily, the total energy " +
+        "consumption grows at a much lower rate, which means more efficient energy consuption per unit performance. " +
+        "</br></br>Other proposals, like using more efficent languages, domain specific hardware, or even fundamental redesign of the basic computor architectures has " +
+        "been proposed and implemented to varying degree of success [1][4].",
+      chart: {
+        end_year: 2020,
+        series: ["transistors", "watts", "efficiency"],
+        scale: "2",
+      }
+    },
+    {
+      title: "References",
+      description: "[1] We're not prepared for the end of Moore's Law, https://www.technologyreview.com/2020/02/24/905789/were-not-prepared-for-the-end-of-moores-law/" +
+        "</br>[2] No More Transistors: The End of Moore’s Law, https://interestingengineering.com/no-more-transistors-the-end-of-moores-law" +
+        "</br>[3] Multi-core CPUs: the end of Moore's law, https://www.networkworld.com/article/2231845/multi-core-cpus--the-end-of-moore-s-law.html" +
+        "</br>[4] Moore's Law Is Dead. Now What?, https://www.technologyreview.com/2016/05/13/245938/moores-law-is-dead-now-what/" +
+        "</br>[5] Microprocessor Trend Data, https://github.com/karlrupp/microprocessor-trend-data",
+      chart: {
+        end_year: 2020,
+        series: ["transistors", "watts", "efficiency"],
+        scale: "2",
+      }
+    },
+  ];
+
+  const SERIES_STYLE = {
+    "transistors": {
+      "display": "Transistors (thousands)",
+      "color": "#488f31",
+    },
+    "frequency": {
+      "display": "Clock Frequency (Mhz)",
+      "color": "#a5a749",
+    },
+    "cores": {
+      "display": "Cores",
+      "color": "#edbf7e",
+    },
+    "watts": {
+      "display": "Power (watts)",
+      "color": "#e58357",
+    },
+    "efficiency": {
+      "display": "Efficiency (right)",
+      "color": "#de425b",
+      "format": 10,
+    }
+  }
+
+  function runApp(data) {
+    var currentStage = 0;
+    let PADDING = 25;
+    let CHART_WIDTH = 500;
+    let TRANSITION_TIME = 300;
+    let x = d3.scaleLinear().domain([1970, 2020]).range([0, CHART_WIDTH - PADDING * 6]);
+    let y = d3.scaleLog().domain([1, 1e7]).range([CHART_WIDTH - PADDING * 2, 0]);
+    let y2 = d3.scaleLog().domain([1e-6, 1]).range([CHART_WIDTH - PADDING * 2, 0]);
+
+    let chart = d3.select("#chart").append("g").attr("transform", "translate(50, 25)");
+    let tooltip = d3.select("body").append("div")
+      .style("opacity", 0).style("position", "absolute").style("pointer-events", "none")
+      .style("border", "1px").style("border-radius", "8px")
+      .style("padding", "12px").style("background", "#eeeeee");
+
+    (function initChart() {
+      chart.append("g").attr("transform", "translate(0, 450)").call(d3.axisBottom(x));
+      chart.append("g").attr("transform", "translate(0, 0)").call(d3.axisLeft(y));
+      chart.append("g").attr("id", "legend").attr("transform", "translate(25, 0)");
+    })();
+
+    function updateChart(toStage) {
+      // series
+      STAGES[toStage].chart.series.forEach(function (n, i) {
+        let style = SERIES_STYLE[n];
+
+        let series = chart.select(`#${n}`);
+        if (series.empty()) {
+          series = chart.append("g").attr("id", `${n}`);
+        }
+        let dot = series.selectAll("circle").data(data[n].filter(row => row.year <= STAGES[toStage].chart.end_year));
+        dot.enter().append("circle")
+          .attr("cx", d => x(d.year))
+          .attr("cy", d => ((STAGES[toStage].chart.scale == "1" || n != "efficiency") ? y : y2)(d.value))
+          .attr("r", 0)
+          .style("fill", style.color)
+          .on("mouseover", function (d) {
+            tooltip.transition()
+              .duration(TRANSITION_TIME)
+              .style("opacity", .9);
+            tooltip.html(`<b>Year</b>: ${parseFloat(d.year).toFixed(1)} </br> <b>Value</b>: ${parseFloat(d.value).toFixed(style.format ?? 1)}`)
+              .style("left", (d3.event.pageX) + "px")
+              .style("top", (d3.event.pageY) - 64 + "px");
+          })
+          .on("mouseout", function (d) {
+            tooltip.transition()
+              .duration(TRANSITION_TIME)
+              .style("opacity", 0);
+          })
+          .transition().duration(TRANSITION_TIME).attr("r", 2);
+        dot.exit().transition().duration(TRANSITION_TIME).attr("r", 0).remove();
+      });
+      // remove series
+      Object.keys(SERIES_STYLE).filter(n => STAGES[toStage].chart.series.indexOf(n) < 0).forEach(function (n) {
+        chart.selectAll(`#${n}`).selectAll("circle").transition().duration(TRANSITION_TIME).attr("r", 0).remove();
+      });
+
+      // legend
+      let legend = d3.select("#legend").selectAll("g").data(STAGES[toStage].chart.series);
+      let g = legend.enter().append("g");
+      g.append("circle").attr("cx", 0).attr('cy', (d, i) => 15 * i).attr("r", 5).style("fill", d => SERIES_STYLE[d].color)
+      g.append("text").attr("x", 10).attr('y', (d, i) => 15 * i).text(d => SERIES_STYLE[d].display).style("font-size", "12px").attr("alignment-baseline", "middle");
+      let t = legend.transition().duration(TRANSITION_TIME);
+      t.select("circle").attr("cx", 0).attr('cy', (d, i) => 15 * i).attr("r", 5).style("fill", d => SERIES_STYLE[d].color)
+      t.select("text").attr("x", 10).attr('y', (d, i) => 15 * i).text(d => SERIES_STYLE[d].display).style("font-size", "12px").attr("alignment-baseline", "middle");
+      legend.exit().remove();
+
+      // axis
+      let y2Axis = chart.select(`#y2`);
+      let y2AxisLabel = chart.select(`#y2_label`);
+      if (y2Axis.empty() && STAGES[toStage].chart.scale === "2") {
+        y2Axis = chart.append("g").attr("id", "y2").attr("transform", "translate(350, 0)").call(d3.axisRight(y2));
+        chart.append("g").attr("id", "y2_label").append("text").attr("text-anchor", "middle").attr("x", 225).attr("y", -400)
+          .attr("transform", "rotate(90)").text("Efficiency Scale (watt/thousand transistors)");
+      } else if (!y2Axis.empty() && STAGES[toStage].chart.scale !== "2") {
+        y2Axis.transition().duration(TRANSITION_TIME).style("opacity", 0).remove();
+        y2AxisLabel.transition().duration(TRANSITION_TIME).style("opacity", 0).remove();
+      }
+    }
+
+    function updateContent(toStage) {
+      document.getElementById("title").innerHTML = STAGES[toStage].title;
+      document.getElementById("description").innerHTML = STAGES[toStage].description;
+    }
+
+    function updateButtons(toStage) {
+      if (toStage === 0) {
+        document.getElementById("prev").classList.add('disabled');
+      } else {
+        document.getElementById("prev").classList.remove('disabled');
+      }
+      if (toStage === STAGES.length - 1) {
+        document.getElementById("next").classList.add('disabled');
+      } else {
+        document.getElementById("next").classList.remove('disabled');
+      }
+
+      document.getElementById("prev").onclick = function () {
+        transition(toStage - 1);
+        return false;
+      }
+
+      document.getElementById("next").onclick = function () {
+        transition(toStage + 1);
+        return false;
+      }
+    }
+
+
+    function transition(toStage) {
+      updateChart(toStage);
+      updateContent(toStage);
+      updateButtons(toStage);
+    }
+
+    transition(0);
+  }
+
+  async function init() {
+    transistors = await d3.csv("./transistors.csv", {
+      mode: "no-cors",
+    });
+    cores = await d3.csv("./cores.csv", {
+      mode: "no-cors",
+    });
+    frequency = await d3.csv("./frequency.csv", {
+      mode: "no-cors",
+    });
+    watts = await d3.csv("./watts.csv", {
+      mode: "no-cors",
+    });
+    efficiency = await d3.csv("./efficiency.csv", {
+      mode: "no-cors",
+    });
+    runApp({ transistors, cores, frequency, watts, efficiency });
+  }
+</script>
+
+<body onload="init()" style="display: flex; flex-direction: row; align-content: stretch; padding: 24;">
+  <div style="flex: 3; position: relative;">
+    <svg id="chart" preserveAspectRatio="xMinYMin meet" viewbox="0 0 500 500" height="100%" width="100%">
+    </svg>
+  </div>
+  <div style="flex: 2; display:flex; flex-direction: column;">
+    <h1 id="title"></h1>
+    <p id="description" style="flex-grow:1"></p>
+    <div style="align-self: center; display: flex; ">
+      <a class="waves-effect waves-light btn" id="prev" style="margin: 12;" href="#">Prev</a>
+      <a class="waves-effect waves-light btn" id="next" style="margin: 12;" href="#">Next</a>
+    </div>
+  </div>
+  <script></script>
+</body>
+
+</html>
