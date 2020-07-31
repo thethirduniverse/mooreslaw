@@ -18,6 +18,11 @@
         end_year: 2005,
         series: ["transistors", "frequency"],
         scale: "1",
+        annotation: {
+          x: 200,
+          y: 300,
+          content: ["steady increase in ", "single core performance"]
+        }
       }
     },
     {
@@ -35,6 +40,11 @@
         end_year: 2020,
         series: ["transistors", "frequency", "cores"],
         scale: "1",
+        annotation: {
+          x: 0,
+          y: 100,
+          content: ["single core performance plateaued, ", "more cores to the rescue"]
+        }
       }
     },
     {
@@ -49,6 +59,11 @@
         end_year: 2020,
         series: ["transistors", "watts", "efficiency"],
         scale: "2",
+        annotation: {
+          x: 0,
+          y: 200,
+          content: ["chip efficiency ", "steadily improving"]
+        }
       }
     },
     {
@@ -84,7 +99,7 @@
       "color": "#e58357",
     },
     "efficiency": {
-      "display": "Efficiency (right)",
+      "display": "Efficiency (right) (smaller is better)",
       "color": "#de425b",
       "format": 10,
     }
@@ -109,6 +124,7 @@
       chart.append("g").attr("transform", "translate(0, 450)").call(d3.axisBottom(x));
       chart.append("g").attr("transform", "translate(0, 0)").call(d3.axisLeft(y));
       chart.append("g").attr("id", "legend").attr("transform", "translate(25, 0)");
+      chart.append("text").attr("id", "annotation").attr("transform", "translate(25, 0)");
     })();
 
     function updateChart(toStage) {
@@ -156,6 +172,20 @@
       t.select("circle").attr("cx", 0).attr('cy', (d, i) => 15 * i).attr("r", 5).style("fill", d => SERIES_STYLE[d].color)
       t.select("text").attr("x", 10).attr('y', (d, i) => 15 * i).text(d => SERIES_STYLE[d].display).style("font-size", "12px").attr("alignment-baseline", "middle");
       legend.exit().remove();
+
+      // annotation
+      let annotation = d3.select("#annotation");
+      let annotationData = STAGES[toStage].chart.annotation;
+      if (annotationData) {
+        annotation.transition().duration(TRANSITION_TIME).style("opacity", 1).attr("x", annotationData.x).attr("y", annotationData.y);
+
+        let s = annotation.selectAll("tspan").data(annotationData.content);
+        s.enter().append("tspan").text((d) => d).text((d) => d).attr("dy", (d, i) => i + "em").attr("x", annotationData.x).attr("alignment-baseline", "middle");
+        s.transition().duration(TRANSITION_TIME).text((d) => d).attr("dy", (d, i) => i + "em").attr("x", annotationData.x).attr("alignment-baseline", "middle");
+        s.exit().remove();
+      } else {
+        annotation.transition().duration(TRANSITION_TIME).style("opacity", 0);
+      }
 
       // axis
       let y2Axis = chart.select(`#y2`);
